@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"util"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -11,10 +12,11 @@ import (
 var database *sql.DB
 
 type User struct {
-	Id       int
-	Name     string
-	Password string
-	Session  string
+	Id        int
+	Name      string
+	Password  string
+	Session   string
+	UserLevel int
 }
 
 func InitDB() {
@@ -23,7 +25,8 @@ func InitDB() {
     'Id' 		INTEGER PRIMARY KEY AUTOINCREMENT,
     'Name' 		TEXT    NOT NULL,
     'Password' 	TEXT    NOT NULL,
-    'Session' 	TEXT    NOT NULL
+    'Session' 	TEXT    NOT NULL DEFAULT '',
+	'UserLevel' INTEGER NOT NULL DEFAULT 0
 	);`
 
 	res, err := database.Exec(create)
@@ -41,7 +44,7 @@ func GetUserByName(name string) *User {
 	defer stmt.Close()
 
 	user := &User{}
-	err := stmt.QueryRow(name).Scan(&user.Id, &user.Name, &user.Password, &user.Session)
+	err := stmt.QueryRow(name).Scan(&user.Id, &user.Name, &user.Password, &user.Session, &user.UserLevel)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -50,19 +53,28 @@ func GetUserByName(name string) *User {
 	return user
 }
 
+func CreateUser(name string, password string) {
+	stmt, _ := database.Prepare("INSERT INTO userinfo (Name, Password) VALUES (?,?)")
+	defer stmt.Close()
+
+	res, err := stmt.Exec(&name, &password)
+	log.Println(res, err)
+
+}
+
 func (u *User) ClearCookie() { //Logout
 	u.Session = ""
 	u.SaveToDatabase()
 }
 
 func (u *User) GenerateCookie() {
-	u.Session = "session"
+	u.Session, _ = util.GenerateRandomString(30)
 	u.SaveToDatabase()
 }
 
 func (u *User) SaveToDatabase() {
 	stmt, err := database.Prepare("UPDATE userinfo SET Password=?, Session=? WHERE Id=?")
-	log.Println(err)
 	defer stmt.Close()
-	stmt.Exec(&u.Password, &u.Session, &u.Id)
+	res, err := stmt.Exec(&u.Password, &u.Session, &u.Id)
+	log.Println("SaveToDatabase()", res, err)
 }

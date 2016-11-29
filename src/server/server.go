@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -30,6 +31,45 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	url := r.URL.Path[5:]
 
+	if url == "reg" {
+		name := r.Form.Get("Name")
+		password := r.Form.Get("Password")
+		password2 := r.Form.Get("Password2")
+		email := r.Form.Get("Email")
+		validMail := regexp.MustCompile(`(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)`)
+		//(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)
+		user := GetUserByName(name)
+		if user != nil {
+			log.Println("user exists")
+			http.Redirect(w, r, "/public/register.html#invalid_register", 307)
+			return
+		}
+
+		if len(name) < 3 {
+			log.Println("name too short")
+			http.Redirect(w, r, "/public/register.html#name_too_short", 307)
+			return
+		}
+		if len(password) < 3 {
+			log.Println("pass too short")
+			http.Redirect(w, r, "/public/register.html#password_too_short", 307)
+			return
+		}
+		if password != password2 {
+			log.Println("pass not equal")
+			http.Redirect(w, r, "/public/register.html#passwords_different", 307)
+			return
+		}
+
+		if !validMail.MatchString(email) {
+			log.Println("email not an email")
+			http.Redirect(w, r, "/public/register.html#email_invalid", 307)
+			return
+		}
+
+		CreateUser(name, password)
+		http.Redirect(w, r, "/public/login.html#register_succesful", 307)
+	}
 	if url == "login" {
 		name := r.Form.Get("Name")
 		password := r.Form.Get("Password")
@@ -61,19 +101,30 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", 307)
 		return
 	}
-
+	//BEYOND THIS -> LOGIN REQUIRED
 	user := getUserFromRequest(r)
 	if user == nil {
+		ClearHTTPCookie(w)
 		w.WriteHeader(401)
 		return
 	}
 
 	if url == "logout" {
+		log.Println("logout")
+		ClearHTTPCookie(w)
 		user.ClearCookie()
 		return
 	}
 
 	log.Println(url)
+}
+
+func ClearHTTPCookie(w http.ResponseWriter) {
+	expiration := time.Now().Add(-24 * time.Hour)
+	nCookie := http.Cookie{Name: "username", Value: "", Expires: expiration, Path: "/"}
+	sCookie := http.Cookie{Name: "session", Value: "", Expires: expiration, Path: "/"}
+	http.SetCookie(w, &nCookie)
+	http.SetCookie(w, &sCookie)
 }
 
 func main() {
@@ -97,11 +148,12 @@ func getUserFromRequest(r *http.Request) *User {
 	}
 
 	user := GetUserByName(username.Value)
+	log.Println(username.Value, sessioncookie.Value, user)
 	if user == nil {
 		return nil
 	}
 
-	if user.Session != sessioncookie.Value {
+	if user.Session != sessioncookie.Value || len(sessioncookie.Value) <= 0 {
 		return nil
 	}
 

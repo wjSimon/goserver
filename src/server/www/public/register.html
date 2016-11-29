@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Register</title>
+	</head>
+<body>
+	<form action="/rpc/reg" method="post">
+	USERNAME:  <input type="text" name="Name" />
+	<br>
+	PASSWORD:  <input type="password" name="Password" />
+	<br>
+	RETYPE PASSWORD:  <input type="password" name="Password2" />
+	<br>
+	EMAIL:  <input type="text" name="Email" />
+	<br>
+	RECEIVE NEWSLETTER: <input type="checkbox" name="check" checked id="box" onclick="savePos()" />
+	<br>
+	<br>
+	<button type="submit" onmouseover="recheck()" >Register</button>
+	</form>
+	
+		<script>
+		
+		
+		var x = 0;
+		var y = 0;
+		
+		function recheck(){
+			document.getElementById('box').checked = true;
+		}
+		
+		function savePos(){
+		var e = window.event;
+
+		
+		x = e.clientX;
+		y = e.clientY;
+		
+		console.log(x,y);
+		}
+		
+		function checkPos()
+		{
+		var e = window.event;
+		var x2 = e.clientX;
+		var y2 = e.clientY;
+			if(Math.sqrt(((x-x2)*(x-x2)) + ((y-y2)*(y-y2))) > 50){
+			recheck();
+			}
+		}
+		
+		document.onmousemove = checkPos;
+	</script> 
+</body>
+</html>
