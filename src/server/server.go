@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"log"
 	"net/http"
 	"regexp"
@@ -93,7 +94,7 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 
 		expiration := time.Now().Add(365 * 24 * time.Hour * 100)
 
-		nCookie := http.Cookie{Name: "username", Value: user.Name, Expires: expiration, Path: "/"}
+		nCookie := http.Cookie{Name: "username", Value: base64.URLEncoding.EncodeToString([]byte(user.Name)), Expires: expiration, Path: "/"}
 		sCookie := http.Cookie{Name: "session", Value: user.Session, Expires: expiration, Path: "/"}
 		http.SetCookie(w, &nCookie)
 		http.SetCookie(w, &sCookie)
@@ -142,6 +143,8 @@ func getUserFromRequest(r *http.Request) *User {
 		return nil
 	}
 
+	usernameByte, _ := base64.URLEncoding.DecodeString(username.Value)
+	username.Value = string(usernameByte)
 	sessioncookie, err := r.Cookie("session")
 	if err != nil {
 		return nil
