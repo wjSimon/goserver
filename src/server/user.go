@@ -9,7 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var database *sql.DB
+var dbUser *sql.DB
 
 type User struct {
 	Id        int
@@ -19,8 +19,8 @@ type User struct {
 	UserLevel int
 }
 
-func InitDB() {
-	database, _ = sql.Open("sqlite3", "data/user.sqlitedb")
+func InitDbUser() {
+	dbUser, _ = sql.Open("sqlite3", "data/user.sqlitedb")
 	create := `CREATE TABLE 'userinfo' (
     'Id' 		INTEGER PRIMARY KEY AUTOINCREMENT,
     'Name' 		TEXT    NOT NULL,
@@ -29,10 +29,10 @@ func InitDB() {
 	'UserLevel' INTEGER NOT NULL DEFAULT 0
 	);`
 
-	res, err := database.Exec(create)
+	res, err := dbUser.Exec(create)
 	log.Println(res, err)
 
-	res, err = database.Exec("CREATE UNIQUE INDEX index_Name on userinfo (Name);")
+	res, err = dbUser.Exec("CREATE UNIQUE INDEX index_Name on userinfo (Name);")
 	log.Println(res, err)
 
 	//GetUserByName("dummy2")
@@ -40,7 +40,7 @@ func InitDB() {
 
 func GetUserByName(name string) *User {
 
-	stmt, _ := database.Prepare("SELECT * FROM userinfo WHERE Name=?")
+	stmt, _ := dbUser.Prepare("SELECT * FROM userinfo WHERE Name=?")
 	defer stmt.Close()
 
 	user := &User{}
@@ -54,12 +54,11 @@ func GetUserByName(name string) *User {
 }
 
 func CreateUser(name string, password string) {
-	stmt, _ := database.Prepare("INSERT INTO userinfo (Name, Password) VALUES (?,?)")
+	stmt, _ := dbUser.Prepare("INSERT INTO userinfo (Name, Password) VALUES (?,?)")
 	defer stmt.Close()
 
 	res, err := stmt.Exec(&name, &password)
 	log.Println(res, err)
-
 }
 
 func (u *User) ClearCookie() { //Logout
@@ -73,7 +72,7 @@ func (u *User) GenerateCookie() {
 }
 
 func (u *User) SaveToDatabase() {
-	stmt, err := database.Prepare("UPDATE userinfo SET Password=?, Session=? WHERE Id=?")
+	stmt, err := dbUser.Prepare("UPDATE userinfo SET Password=?, Session=? WHERE Id=?")
 	defer stmt.Close()
 	res, err := stmt.Exec(&u.Password, &u.Session, &u.Id)
 	log.Println("SaveToDatabase()", res, err)

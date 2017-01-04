@@ -7,6 +7,10 @@ public class NetworkManager : MonoBehaviour {
 
 	string username = "test";
 	string password = "123456";
+
+	string usercookie = "";
+	string sessioncookie = "";
+
 	string host = "http://localhost";
 
 	// Use this for initialization
@@ -31,21 +35,18 @@ public class NetworkManager : MonoBehaviour {
 		yield return www;
 
 		Debug.Log(GetResponseCode(www));
-		Debug.Log(GetCookie(www));
+		Debug.Log(GetLoginData(www));
 		/**/
 	}
 
-
-	public static string GetCookie(WWW request)
+	public bool GetLoginData(WWW request)
 	{
-		string cookie = "";
-		foreach (KeyValuePair<string, string> entry in request.responseHeaders)
-		{
-			Debug.Log(entry.Key + "=" + entry.Value);
-		}
+		request.responseHeaders.TryGetValue("HUSERNAME", out usercookie);
+		request.responseHeaders.TryGetValue("HSESSION", out sessioncookie);
 
-		request.responseHeaders.TryGetValue("Set-Cookie", out cookie);
-		return cookie;
+		if(usercookie == null || sessioncookie == null) { return false; }
+		Debug.Log(usercookie + " " + sessioncookie);
+		return true;
 	}
 	public static int GetResponseCode(WWW request)
 	{

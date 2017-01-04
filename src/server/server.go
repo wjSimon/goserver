@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"log"
 	"net/http"
 	"regexp"
@@ -29,7 +30,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlerRpc(w http.ResponseWriter, r *http.Request) {
+	timeNow := time.Now().UnixNano()
+
 	r.ParseForm()
+	mParams := r.URL.Query()
 	url := r.URL.Path[5:]
 
 	if url == "reg" {
@@ -152,6 +156,51 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	player := GetPlayerByUserId(user.Id)
+	if player == nil {
+		CreatePlayer(user.Id)
+		player = GetPlayerByUserId(user.Id)
+	}
+
+	//timeNow := time.Now().UnixNano()
+	//requestCount++
+
+	var err error
+	var data interface{}
+
+	defer func() {
+		timeDone := time.Now().UnixNano()
+		//requestDuration += timeDone - timeNow
+		log.Println("Dur:", (timeDone-timeNow)/(1000000))
+
+		var result = map[string]interface{}{}
+		result["ts"] = ((timeDone + timeNow) / 2) / 1000000
+		result["tc"] = mParams.Get("tc")
+
+		if err == nil {
+			result["result"] = true
+		} else {
+			//requestErr++
+			log.Println("rpc error:", url, err, data)
+			result["result"] = false
+			result["error"] = err.Error()
+		}
+		if data != nil {
+			result["data"] = data
+		}
+		msg, _ := json.Marshal(result)
+		w.Write(msg)
+	}()
+
+	if url == "mineYellow" {
+		player.ResYellow += 10
+		//player.SaveToDatabase()
+
+		data = map[string]interface{}{"player": player}
+
+		return
+	}
+
 	log.Println(url)
 }
 
@@ -165,7 +214,8 @@ func ClearHTTPCookie(w http.ResponseWriter) {
 
 func main() {
 
-	InitDB()
+	InitDbUser()
+	InitDbGame()
 
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/rpc/", handlerRpc)
