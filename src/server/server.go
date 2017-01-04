@@ -94,12 +94,47 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 
 		expiration := time.Now().Add(365 * 24 * time.Hour * 100)
 
-		nCookie := http.Cookie{Name: "username", Value: base64.URLEncoding.EncodeToString([]byte(user.Name)), Expires: expiration, Path: "/"}
+		var RawURLEncoding = base64.URLEncoding.WithPadding(base64.NoPadding)
+		nCookie := http.Cookie{Name: "username", Value: RawURLEncoding.EncodeToString([]byte(user.Name)), Expires: expiration, Path: "/"}
 		sCookie := http.Cookie{Name: "session", Value: user.Session, Expires: expiration, Path: "/"}
 		http.SetCookie(w, &nCookie)
 		http.SetCookie(w, &sCookie)
 
 		http.Redirect(w, r, "/", 307)
+		log.Println("login successful")
+		log.Println(r.UserAgent())
+
+		return
+	}
+	if url == "loginunity" {
+		name := r.Form.Get("Name")
+		password := r.Form.Get("Password")
+
+		user := GetUserByName(name)
+		if user == nil {
+			log.Println("user nil")
+			w.WriteHeader(401)
+			return
+		}
+
+		if user.Password != password {
+			log.Println("pass wrong")
+			w.WriteHeader(401)
+			return
+		}
+
+		if len(user.Session) <= 0 {
+			user.GenerateCookie()
+		}
+
+		var RawURLEncoding = base64.URLEncoding.WithPadding(base64.NoPadding)
+		w.Header().Set("hUsername", RawURLEncoding.EncodeToString([]byte(user.Name)))
+		w.Header().Set("hSession", user.Session)
+
+		w.WriteHeader(200)
+		log.Println("login successful")
+		log.Println(r.UserAgent())
+
 		return
 	}
 	//BEYOND THIS -> LOGIN REQUIRED
@@ -143,7 +178,8 @@ func getUserFromRequest(r *http.Request) *User {
 		return nil
 	}
 
-	usernameByte, _ := base64.URLEncoding.DecodeString(username.Value)
+	var RawURLEncoding = base64.URLEncoding.WithPadding(base64.NoPadding)
+	usernameByte, _ := RawURLEncoding.DecodeString(username.Value)
 	username.Value = string(usernameByte)
 	sessioncookie, err := r.Cookie("session")
 	if err != nil {
