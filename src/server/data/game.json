@@ -1,0 +1,12 @@
+{
+	"Version": 1,
+	"Players": [
+		{
+			"Id": 0,
+			"UserId": 1,
+			"ResRed": 0,
+			"ResBlue": 0,
+			"ResYellow": 590
+		}
+	]
+}

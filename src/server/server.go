@@ -194,7 +194,6 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 
 	if url == "mineYellow" {
 		player.ResYellow += 10
-		//player.SaveToDatabase()
 
 		data = map[string]interface{}{"player": player}
 

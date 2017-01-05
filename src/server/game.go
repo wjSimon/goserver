@@ -3,11 +3,17 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
+	"encoding/json"
+	"io/ioutil"
 	"log"
+	"os"
+	"sync"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+const GAMEDATAVERSION = 1
 
 var dbGame *sql.DB
 
@@ -19,52 +25,102 @@ type Player struct {
 	ResYellow int
 }
 
+type GameData struct {
+	Version int
+	Players []*Player
+}
+
+var gameData GameData
+var User2PlayerId map[int]int
+var PlayerMutex sync.RWMutex
+
 func InitDbGame() {
-	dbGame, _ = sql.Open("sqlite3", "data/game.sqlitedb?_bulsy_timeout=5000")
-	//dbGame.Exec("PRAGMA busy_timeout = 50000;")
-	dbGame.SetMaxOpenConns(1)
+	LoadDbGame()
 
-	create := `CREATE TABLE 'player' (
-    'Id' 		INTEGER PRIMARY KEY AUTOINCREMENT,
-    'UserId' 	INTEGER NOT NULL,
-    'ResRed' 	INTEGER NOT NULL DEFAULT 0,
-    'ResBlue' 	INTEGER NOT NULL DEFAULT 0, 
-	'ResYellow' INTEGER NOT NULL DEFAULT 0
-	);`
+	go func() {
+		for {
+			time.Sleep(time.Second * 5 * 60)
+			SaveDbGame()
+		}
+	}()
+}
 
-	res, err := dbGame.Exec(create)
-	log.Println(res, err)
+func SaveDbGame() {
+	gameData.Version = GAMEDATAVERSION
+	PlayerMutex.RLock()
+	b, err := json.MarshalIndent(&gameData, "", "\t")
+	PlayerMutex.RUnlock()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
-	res, err = dbGame.Exec("CREATE UNIQUE INDEX index_UserId on player (UserId);")
-	log.Println(res, err)
+	ioutil.WriteFile("data/game.json_temp", b, 0644)
+	os.Remove("data/game.json_old")
+	os.Rename("data/game.json", "data/game.json_old")
+	os.Rename("data/game.json_temp", "data/game.json")
+	os.Remove("data/game.json_old")
+	log.Println("Game data saved successfully")
+}
+
+func LoadDbGame() {
+
+	User2PlayerId = make(map[int]int)
+
+	b, err := ioutil.ReadFile("data/game.json")
+	if err != nil {
+		os.Rename("data/game.json_old", "data/game.json")
+		log.Println(err)
+		b, err = ioutil.ReadFile("data/game.json")
+		if err != nil {
+			log.Println("load failed")
+			return
+		}
+	}
+
+	PlayerMutex.Lock()
+	err = json.Unmarshal(b, &gameData)
+
+	for _, v := range gameData.Players {
+		User2PlayerId[v.UserId] = v.Id
+	}
+	PlayerMutex.Unlock()
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Println("Game data loaded successfully")
 }
 
 func CreatePlayer(UserId int) {
-	stmt, _ := dbGame.Prepare("INSERT INTO player (UserId) VALUES (?)")
-	defer stmt.Close()
+	PlayerMutex.Lock()
+	defer PlayerMutex.Unlock()
 
-	res, err := stmt.Exec(&UserId)
-	log.Println(res, err)
+	_, ok := User2PlayerId[UserId]
+	if ok {
+		log.Println("already existing player")
+		return
+	}
+	p := &Player{
+		UserId: UserId,
+		Id:     len(gameData.Players),
+	}
+	gameData.Players = append(gameData.Players, p)
+	User2PlayerId[UserId] = p.Id
+	log.Println("player created", UserId, p.Id, len(gameData.Players))
+	return
 }
 
 func GetPlayerByUserId(UserId int) *Player {
 
-	stmt, _ := dbGame.Prepare("SELECT * FROM player WHERE UserId=?")
-	defer stmt.Close()
-
-	player := &Player{}
-	err := stmt.QueryRow(UserId).Scan(&player.Id, &player.UserId, &player.ResRed, &player.ResBlue, &player.ResYellow)
-	if err != nil {
-		log.Println(err)
+	PlayerMutex.RLock()
+	defer PlayerMutex.RUnlock()
+	i, ok := User2PlayerId[UserId]
+	if !ok {
 		return nil
 	}
-	fmt.Println(player)
-	return player
-}
-
-func (p *Player) SaveToDatabase() {
-	stmt, err := dbGame.Prepare("UPDATE player SET ResRed=?, ResBlue=?, ResYellow=? WHERE Id=?")
-	defer stmt.Close()
-	res, err := stmt.Exec(&p.ResRed, &p.ResBlue, &p.ResYellow, &p.Id)
-	log.Println("SaveToDatabase()", res, err)
+	log.Println("player get", UserId, i, ok, len(gameData.Players))
+	return gameData.Players[i]
 }

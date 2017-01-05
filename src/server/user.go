@@ -21,6 +21,7 @@ type User struct {
 
 func InitDbUser() {
 	dbUser, _ = sql.Open("sqlite3", "data/user.sqlitedb")
+	dbUser.SetMaxOpenConns(1)
 	create := `CREATE TABLE 'userinfo' (
     'Id' 		INTEGER PRIMARY KEY AUTOINCREMENT,
     'Name' 		TEXT    NOT NULL,
