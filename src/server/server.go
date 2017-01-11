@@ -110,6 +110,12 @@ func handlerRpc(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	if url == "test8266" {
+		w.Write([]byte("esp8266 test successful"))
+		log.Println(r.UserAgent())
+		return
+	}
+
 	if url == "loginunity" {
 		name := r.Form.Get("Name")
 		password := r.Form.Get("Password")
