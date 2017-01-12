@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jacobsa/go-serial/serial"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -217,10 +221,61 @@ func ClearHTTPCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &sCookie)
 }
 
+func SerialIO() {
+
+	options := serial.OpenOptions{
+		PortName:        "COM4",
+		BaudRate:        115200,
+		DataBits:        8,
+		StopBits:        1,
+		MinimumReadSize: 4,
+	}
+
+	port, err := serial.Open(options)
+	if err != nil {
+		log.Fatalf("serial.Open: %v", err)
+	}
+
+	// Make sure to close it later.
+	//defer port.Close()
+
+	reader := bufio.NewReader(port)
+	//text := ""
+	i := 0
+	for {
+		if reader != nil {
+			//text, err = reader.ReadString('\n')
+		}
+		if err != nil || reader == nil {
+			log.Println("readerror: ", err)
+			time.Sleep(time.Second * 1)
+			//port.Close()
+			reader = nil
+			port, err = serial.Open(options)
+			if err == nil {
+				reader = bufio.NewReader(port)
+			}
+
+			continue
+		}
+		//text = text[:len(text)-1]
+		//log.Println("serial: ", text)
+
+		msg := strconv.Itoa(i /*rand.Intn(1024)*/) + "\n"
+		port.Write([]byte(msg))
+		log.Print(msg)
+		time.Sleep(time.Millisecond * 1)
+		i++
+		i %= 1024
+	}
+}
+
 func main() {
 
 	InitDbUser()
 	InitDbGame()
+
+	go SerialIO()
 
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/rpc/", handlerRpc)
